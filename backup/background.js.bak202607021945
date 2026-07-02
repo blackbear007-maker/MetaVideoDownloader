@@ -3,16 +3,16 @@
 
 // Download video function
 function downloadVideo(url, filename) {
-  console.log('[MetaVideoDownloader] Starting download:', url, filename);
+  console.log('[Threads Downloader] Starting download:', url, filename);
   chrome.downloads.download({
     url: url,
     filename: filename,
     saveAs: true
   }, (downloadId) => {
     if (chrome.runtime.lastError) {
-      console.error("[MetaVideoDownloader] Download error:", chrome.runtime.lastError);
+      console.error("[Threads Downloader] Download error:", chrome.runtime.lastError);
     } else {
-      console.log("[MetaVideoDownloader] Download started:", downloadId);
+      console.log("[Threads Downloader] Download started:", downloadId);
     }
   });
 }

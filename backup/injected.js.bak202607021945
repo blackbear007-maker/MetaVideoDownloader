@@ -54,9 +54,7 @@
 
     if (hd || sd) {
       const id = obj.id || obj.videoId || obj.video_id || obj.post_id || null;
-      const w = obj.original_width || obj.width || null;
-      const h = obj.original_height || obj.height || null;
-      report({ id: id ? String(id) : null, hd: hd, sd: sd, w: w || null, h: h || null });
+      report({ id: id ? String(id) : null, hd: hd, sd: sd });
     }
 
     // Recurse
@@ -72,29 +70,17 @@
     }
   }
 
-  // Extract URLs directly via regex as a robust fallback.
-  // Track the nearest preceding video id so large responses can still be
-  // matched to the clicked video element by id.
+  // Extract URLs directly via regex as a robust fallback
   function regexScan(text) {
-    // Matches an id field, a video-specific dimension, OR a video url field,
-    // in document order. We track the nearest preceding id and dimensions so
-    // large responses can still be matched to the clicked video element.
-    const re = /"(?:video_id|videoId)"\s*:\s*"(\d+)"|"id"\s*:\s*"(\d+)"|"original_width"\s*:\s*(\d+)|"original_height"\s*:\s*(\d+)|"(browser_native_hd_url|playable_url_quality_hd|browser_native_sd_url|playable_url|progressive_url)"\s*:\s*"([^"]+)"/g;
+    const re = /"(browser_native_hd_url|playable_url_quality_hd|browser_native_sd_url|playable_url|progressive_url)"\s*:\s*"([^"]+)"/g;
     let m;
-    let lastId = null;
-    let lastW = null;
-    let lastH = null;
     while ((m = re.exec(text)) !== null) {
-      if (m[1]) { lastId = m[1]; continue; }   // explicit video id
-      if (m[2]) { lastId = m[2]; continue; }    // generic id (nearest object)
-      if (m[3]) { lastW = parseInt(m[3], 10); continue; }  // original_width
-      if (m[4]) { lastH = parseInt(m[4], 10); continue; }  // original_height
-      const key = m[5];
-      let url = m[6];
+      const key = m[1];
+      let url = m[2];
       try { url = JSON.parse('"' + url + '"'); } catch (e) { url = url.replace(/\\\//g, '/'); }
       if (!url.startsWith('http')) continue;
       const isHd = key.indexOf('hd') !== -1;
-      report({ id: lastId, hd: isHd ? url : null, sd: isHd ? null : url, w: lastW, h: lastH });
+      report({ id: null, hd: isHd ? url : null, sd: isHd ? null : url });
     }
   }
 
@@ -106,12 +92,10 @@
       return;
     }
 
-    // Size limit to prevent DoS (1MB for JSON parsing, but use regex for larger responses)
-    const MAX_SIZE = 1024 * 1024; // 1MB
+    // Size limit to prevent DoS (10MB - increased for Reel support)
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB
     if (text.length > MAX_SIZE) {
-      console.log('[MetaVideoDownloader] Large response, using regex scan:', text.length);
-      // For large responses (like Reel), use regex scan instead of JSON parsing
-      regexScan(text);
+      console.warn('[Threads Downloader] Response too large, skipping:', text.length);
       return;
     }
 
@@ -172,5 +156,5 @@
     return origSend.apply(this, arguments);
   };
 
-  console.log('[MetaVideoDownloader] Facebook network hook installed');
+  console.log('[Threads Downloader] Facebook network hook installed');
 })();

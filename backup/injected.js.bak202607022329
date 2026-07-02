@@ -109,7 +109,7 @@
     // Size limit to prevent DoS (1MB for JSON parsing, but use regex for larger responses)
     const MAX_SIZE = 1024 * 1024; // 1MB
     if (text.length > MAX_SIZE) {
-      console.log('[MetaVideoDownloader] Large response, using regex scan:', text.length);
+      console.warn('[MetaVideoDownloader] Response too large for JSON parsing, using regex scan:', text.length);
       // For large responses (like Reel), use regex scan instead of JSON parsing
       regexScan(text);
       return;

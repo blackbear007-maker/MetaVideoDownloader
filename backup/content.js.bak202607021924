@@ -1,0 +1,426 @@
+// Content script for Threads Video Downloader
+// Adds download button to videos on Threads
+
+// Add CSS styles for download button
+const style = document.createElement('style');
+style.textContent = `
+  .threads-download-btn {
+    position: fixed;
+    width: 28px;
+    height: 28px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+    z-index: 2147483647;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    pointer-events: auto;
+  }
+
+  .threads-download-btn:hover {
+    background: rgba(255, 255, 255, 1);
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .threads-download-btn svg {
+    width: 14px;
+    height: 14px;
+    fill: #333;
+    pointer-events: none;
+  }
+`;
+(document.head || document.documentElement).appendChild(style);
+
+// ===== Facebook network hook =====
+// Captured video URLs from Facebook's GraphQL responses
+const capturedVideos = new Map(); // id -> { hd, sd }
+const capturedList = [];          // ordered list of { id, hd, sd }
+
+// Inject the hook script into the page's MAIN world (Facebook only)
+function injectHook() {
+  if (getPlatform() !== 'facebook') return;
+  // Verify extension context is still valid (avoids chrome-extension://invalid/)
+  if (!chrome.runtime || !chrome.runtime.id) {
+    console.warn('[Threads Downloader] 擴充功能已更新，請重新整理頁面 (F5)');
+    return;
+  }
+  try {
+    const url = chrome.runtime.getURL('injected.js');
+    if (!url || url.indexOf('invalid') !== -1) {
+      console.warn('[Threads Downloader] 擴充功能已更新，請重新整理頁面 (F5)');
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = url;
+    script.onload = function () { this.remove(); };
+    (document.head || document.documentElement).appendChild(script);
+    console.log('[Threads Downloader] Injecting Facebook hook');
+  } catch (e) {
+    console.error('[Threads Downloader] Failed to inject hook', e);
+  }
+}
+
+// Listen for captured video URLs from the injected script
+window.addEventListener('message', (event) => {
+  if (event.source !== window) return;
+  const data = event.data;
+  if (!data || data.source !== 'threads-fb-hook' || !data.payload) return;
+
+  const record = data.payload;
+  if (record.id) {
+    capturedVideos.set(record.id, record);
+  }
+  capturedList.push(record);
+  // Keep list bounded
+  if (capturedList.length > 200) capturedList.shift();
+  console.log('[Threads Downloader] Captured video URL', record.id || '(no id)');
+});
+
+injectHook();
+
+// Clear captured videos when URL changes (to avoid downloading wrong video from previous page)
+let lastUrl = window.location.href;
+function handleUrlChange() {
+  const currentUrl = window.location.href;
+  if (currentUrl !== lastUrl) {
+    console.log('[Threads Downloader] URL changed, clearing captured videos');
+    capturedVideos.clear();
+    capturedList.length = 0;
+    lastUrl = currentUrl;
+  }
+}
+window.addEventListener('popstate', handleUrlChange);
+// Also check URL changes periodically for SPA navigation
+setInterval(handleUrlChange, 1000);
+
+// Decode JSON-escaped URL string (\u0025 -> %, \/ -> /, etc.)
+function decodeEscapedUrl(str) {
+  try {
+    return JSON.parse('"' + str.replace(/"/g, '\\"') + '"');
+  } catch (e) {
+    return str.replace(/\\\//g, '/').replace(/\\u0025/g, '%').replace(/\\u0026/g, '&');
+  }
+}
+
+// Try to find the Facebook video id near the clicked video element
+function findFacebookVideoId(videoElement) {
+  // Look for links containing a video/reel/watch id
+  let node = videoElement;
+  for (let i = 0; i < 12 && node; i++) {
+    const links = node.querySelectorAll
+      ? node.querySelectorAll('a[href*="/videos/"], a[href*="/reel/"], a[href*="watch/?v="], a[href*="v="]')
+      : [];
+    for (const link of links) {
+      const href = link.getAttribute('href') || '';
+      const m = href.match(/\/videos\/([^/?]+)/) ||
+                href.match(/\/reel\/([^/?]+)/) ||
+                href.match(/[?&]v=([^&]+)/);
+      if (m) return m[1];
+    }
+    node = node.parentElement;
+  }
+  // Try data attributes
+  const dataNode = videoElement.closest('[data-video-id]');
+  if (dataNode) return dataNode.getAttribute('data-video-id');
+  return null;
+}
+
+// Extract a Facebook video URL from page scripts/data
+function getFacebookVideoUrl(videoElement) {
+  const videoId = findFacebookVideoId(videoElement);
+  console.log('[Threads Downloader] Facebook video id:', videoId);
+  console.log('[Threads Downloader] Captured videos count:', capturedList.length);
+  console.log('[Threads Downloader] Captured videos keys:', Array.from(capturedVideos.keys()));
+
+  // 1) Try captured network data matched by video id
+  if (videoId && capturedVideos.has(videoId)) {
+    const rec = capturedVideos.get(videoId);
+    const url = rec.hd || rec.sd;
+    if (url) {
+      console.log('[Threads Downloader] Using captured URL matched by id:', url);
+      return url;
+    }
+  } else if (videoId) {
+    console.log('[Threads Downloader] Video id found but not in capturedVideos');
+  }
+
+  // 2) Use most recently captured video (likely the one being played)
+  if (capturedList.length > 0) {
+    for (let i = capturedList.length - 1; i >= 0; i--) {
+      const rec = capturedList[i];
+      const url = rec.hd || rec.sd;
+      if (url) {
+        console.log('[Threads Downloader] Using most recent captured URL:', url);
+        return url;
+      }
+    }
+  }
+
+  // 3) Fallback: search page source (rarely works for SPA feeds)
+  const html = document.documentElement.innerHTML;
+
+  // URL quality keys in priority order
+  const keys = [
+    'browser_native_hd_url',
+    'playable_url_quality_hd',
+    'browser_native_sd_url',
+    'playable_url',
+    'progressive_url'
+  ];
+
+  // If we have a video id, search near it first for the best match
+  if (videoId) {
+    const idIndex = html.indexOf('"' + videoId + '"');
+    if (idIndex !== -1) {
+      const windowStart = Math.max(0, idIndex - 4000);
+      const windowEnd = Math.min(html.length, idIndex + 4000);
+      const slice = html.slice(windowStart, windowEnd);
+      for (const key of keys) {
+        const re = new RegExp('"' + key + '"\\s*:\\s*"([^"]+)"');
+        const m = slice.match(re);
+        if (m && m[1]) {
+          const url = decodeEscapedUrl(m[1]);
+          console.log(`[Threads Downloader] Found ${key} near video id:`, url);
+          return url;
+        }
+      }
+    }
+  }
+
+  // Fallback: search whole page for any playable URL
+  for (const key of keys) {
+    const re = new RegExp('"' + key + '"\\s*:\\s*"([^"]+)"');
+    const m = html.match(re);
+    if (m && m[1]) {
+      const url = decodeEscapedUrl(m[1]);
+      console.log(`[Threads Downloader] Found ${key} (page fallback):`, url);
+      return url;
+    }
+  }
+
+  console.log('[Threads Downloader] No Facebook video URL found in page data');
+  return null;
+}
+
+// Function to get video URL
+function getVideoUrl(videoElement) {
+  console.log('[Threads Downloader] Getting URL for VIDEO element');
+  const platform = getPlatform();
+
+  // Try src attribute
+  let url = videoElement.src || videoElement.currentSrc;
+  console.log('[Threads Downloader] Video src:', url);
+
+  // Check for source elements
+  const sources = videoElement.querySelectorAll('source');
+  console.log('[Threads Downloader] Found', sources.length, 'source elements');
+  if (sources.length > 0 && (!url || url.startsWith('blob:'))) {
+    url = sources[0].src;
+  }
+
+  // For blob/empty URLs we need to extract the real URL from page data
+  if (!url || url.startsWith('blob:')) {
+    console.log('[Threads Downloader] URL is blob/empty, extracting from page data');
+    if (platform === 'facebook') {
+      const fbUrl = getFacebookVideoUrl(videoElement);
+      if (fbUrl) url = fbUrl;
+    }
+  }
+
+  console.log('[Threads Downloader] Final Video URL:', url);
+  return url;
+}
+
+// Function to get file extension
+function getFileExtension() {
+  return '.mp4';
+}
+
+// Detect current platform from hostname
+function getPlatform() {
+  const host = window.location.hostname;
+  if (host.includes('facebook.com')) {
+    return 'facebook';
+  }
+  return 'threads';
+}
+
+// Function to generate filename
+function generateFilename(videoElement) {
+  let filename = null;
+  const extension = getFileExtension();
+  const platform = getPlatform();
+
+  // Try to get username from post context
+  const postElement = videoElement.closest('[data-visuals]') ||
+                      videoElement.closest('[role="article"]') ||
+                      videoElement.closest('article');
+
+  if (postElement) {
+    const usernameElement = postElement.querySelector('[data-username]') ||
+                            postElement.querySelector('a[href*="/@"]') ||
+                            postElement.querySelector('span[dir="auto"]');
+
+    if (usernameElement) {
+      const username = usernameElement.textContent.trim().replace('@', '').replace(/[^\w\u4e00-\u9fa5]/g, '_').slice(0, 30);
+      const timestamp = Date.now();
+      filename = `${platform}_${username}_video_${timestamp}${extension}`;
+    }
+  }
+
+  // Fallback filename
+  if (!filename) {
+    const timestamp = Date.now();
+    filename = `${platform}_video_${timestamp}${extension}`;
+  }
+
+  return filename;
+}
+
+// Function to download video
+function downloadVideo(videoElement) {
+  const videoUrl = getVideoUrl(videoElement);
+  const filename = generateFilename(videoElement);
+
+  if (videoUrl) {
+    console.log('[Threads Downloader] Downloading:', videoUrl);
+    // Send message to background script to initiate download
+    chrome.runtime.sendMessage({
+      action: "downloadVideo",
+      videoUrl: videoUrl,
+      filename: filename
+    });
+  } else {
+    console.error('[Threads Downloader] No video URL found');
+    const platform = getPlatform();
+    if (platform === 'facebook') {
+      alert('無法取得 Facebook 影片 URL。\n\n建議：先點擊影片進入單獨的影片頁面（網址含 /videos/ 或 /watch/），再點下載按鈕。');
+    } else {
+      alert('無法取得影片 URL，可能是平台的保護機制');
+    }
+  }
+}
+
+// Map of video element -> button element
+const videoButtonMap = new Map();
+
+// Create a download button for a video element
+function createButton(videoElement) {
+  const button = document.createElement('div');
+  button.className = 'threads-download-btn';
+  button.innerHTML = `
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+    </svg>
+  `;
+
+  // Click handler - button is on document.body so it's above Threads overlays
+  const handleClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    console.log('[Threads Downloader] Button clicked on VIDEO');
+    downloadVideo(videoElement);
+  };
+
+  button.addEventListener('click', handleClick, true);
+
+  document.body.appendChild(button);
+  return button;
+}
+
+// Position a button over the top-right corner of its video
+function positionButton(videoElement, button) {
+  const rect = videoElement.getBoundingClientRect();
+
+  // Hide if video is not visible or too small
+  if (rect.width < 40 || rect.height < 40 ||
+      rect.bottom < 0 || rect.top > window.innerHeight ||
+      rect.right < 0 || rect.left > window.innerWidth) {
+    button.style.display = 'none';
+    return;
+  }
+
+  button.style.display = 'flex';
+  button.style.top = `${rect.top + 6}px`;
+  button.style.left = `${rect.right - 28 - 6}px`;
+}
+
+// Register a video and create its button
+function registerVideo(videoElement) {
+  if (videoElement.tagName !== 'VIDEO') {
+    return;
+  }
+  if (videoButtonMap.has(videoElement)) {
+    return;
+  }
+
+  console.log('[Threads Downloader] Registering VIDEO element');
+  const button = createButton(videoElement);
+  videoButtonMap.set(videoElement, button);
+  positionButton(videoElement, button);
+}
+
+// Update all button positions
+function updateAllButtons() {
+  videoButtonMap.forEach((button, videoElement) => {
+    // Clean up removed videos
+    if (!document.body.contains(videoElement)) {
+      button.remove();
+      videoButtonMap.delete(videoElement);
+      return;
+    }
+    positionButton(videoElement, button);
+  });
+}
+
+// Scan for videos and register them
+function scanVideos() {
+  const videos = document.querySelectorAll('video');
+  videos.forEach(registerVideo);
+}
+
+// Update positions on scroll and resize (throttled via rAF)
+let rafScheduled = false;
+function scheduleUpdate() {
+  if (rafScheduled) return;
+  rafScheduled = true;
+  requestAnimationFrame(() => {
+    rafScheduled = false;
+    updateAllButtons();
+  });
+}
+
+// Initialize DOM-dependent features once body is available
+function init() {
+  // Observer to detect new video elements
+  const observer = new MutationObserver(() => {
+    scanVideos();
+  });
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  window.addEventListener('scroll', scheduleUpdate, true);
+  window.addEventListener('resize', scheduleUpdate, true);
+
+  // Periodic update to catch layout changes (e.g. video resizing, lazy load)
+  setInterval(() => {
+    scanVideos();
+    updateAllButtons();
+  }, 500);
+
+  // Initial scan
+  scanVideos();
+}
+
+if (document.body) {
+  init();
+} else {
+  document.addEventListener('DOMContentLoaded', init);
+}

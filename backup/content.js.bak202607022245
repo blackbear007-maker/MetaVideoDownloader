@@ -76,8 +76,6 @@ window.addEventListener('message', (event) => {
     const existing = capturedVideos.get(record.id) || { id: record.id };
     if (record.hd) existing.hd = record.hd;
     if (record.sd) existing.sd = record.sd;
-    if (record.w) existing.w = record.w;
-    if (record.h) existing.h = record.h;
     capturedVideos.set(record.id, existing);
   }
   capturedList.push(record);
@@ -114,17 +112,6 @@ function decodeEscapedUrl(str) {
 
 // Try to find the Facebook video id near the clicked video element
 function findFacebookVideoId(videoElement) {
-  // Highest priority: the reels/watch viewer shows ONE video full-screen and the
-  // page URL is the current video's id. This is the most reliable signal.
-  const loc = window.location.pathname + window.location.search;
-  const locMatch = loc.match(/\/reel\/(\d{6,})/) ||
-                   loc.match(/\/videos\/(\d{6,})/) ||
-                   loc.match(/[?&]v=(\d{6,})/);
-  if (locMatch) {
-    console.log('[MetaVideoDownloader] Using video id from page URL:', locMatch[1]);
-    return locMatch[1];
-  }
-
   // Look for links containing a video/reel/watch id
   let node = videoElement;
   for (let i = 0; i < 12 && node; i++) {
@@ -136,10 +123,7 @@ function findFacebookVideoId(videoElement) {
       const m = href.match(/\/videos\/([^/?]+)/) ||
                 href.match(/\/reel\/([^/?]+)/) ||
                 href.match(/[?&]v=([^&]+)/);
-      // Only accept purely-numeric ids. Feed permalinks can yield post-block
-      // ids like "pcb.4574687359518023", which are NOT video ids and must be
-      // rejected (they cause the wrong video to be downloaded).
-      if (m && /^\d{6,}$/.test(m[1])) return m[1];
+      if (m) return m[1];
     }
     node = node.parentElement;
   }
@@ -320,11 +304,11 @@ function sleep(ms) {
 }
 
 // Isolate the clicked video (pause every other <video>), force it to play, and
-// poll its currentSrc. For progressive/buffered videos, the real fbcdn URL
-// appears directly on the element. Since this is the clicked element's own
-// currentSrc, it's inherently correct for that element (no need to validate
-// against external captures). We accept it immediately if it's a fbcdn URL.
+// return the URL that this specific element loads. For progressive videos this
+// is videoElement.currentSrc; for DASH/MSE it is the first NEW network capture
+// triggered by our play(). This ties the user's click to the correct URL.
 async function isolateAndCapture(videoElement) {
+  const before = capturedList.length;
   const others = Array.from(document.querySelectorAll('video')).filter((v) => v !== videoElement);
   others.forEach((v) => { try { v.pause(); } catch (e) {} });
 
@@ -335,11 +319,16 @@ async function isolateAndCapture(videoElement) {
   } catch (e) {}
 
   for (let i = 0; i < 20; i++) {
+    // Progressive videos expose the real URL directly on the element
     const cs = videoElement.currentSrc || videoElement.src;
-    // Accept any non-blob HTTP URL from this element (it's the clicked element's own URL)
-    if (cs && !cs.startsWith('blob:') && cs.indexOf('http') === 0) {
-      console.log('[MetaVideoDownloader] Got currentSrc from clicked element:', cs);
-      return cs;
+    if (cs && !cs.startsWith('blob:') && cs.indexOf('http') === 0) return cs;
+
+    // DASH/MSE: our play() triggers a fresh fetch that gets captured; since we
+    // paused all other videos, the newest capture is very likely this one.
+    if (capturedList.length > before) {
+      const rec = capturedList[capturedList.length - 1];
+      const u = rec.hd || rec.sd;
+      if (u) return u;
     }
     await sleep(150);
   }
@@ -369,54 +358,28 @@ function getUrlDurationSeconds(url) {
   return null;
 }
 
-// Find a captured URL whose embedded duration matches the clicked video's
-// duration, disambiguated by the clicked element's exact resolution when
-// multiple candidates share the same duration.
+// Find a captured URL whose embedded duration matches the clicked video's duration.
+// This is a robust match when the Facebook video id can't be extracted from the DOM.
 function capturedUrlByDuration(videoElement) {
   const dur = videoElement && videoElement.duration;
   if (!dur || !isFinite(dur)) return null;
   const target = Math.round(dur);
-  const vw = videoElement.videoWidth || 0;
-  const vh = videoElement.videoHeight || 0;
-
   const matches = [];
   for (let i = capturedList.length - 1; i >= 0; i--) {
     const rec = capturedList[i];
     const url = rec.hd || rec.sd;
     if (!url) continue;
     const d = getUrlDurationSeconds(url);
-    if (d != null && Math.abs(d - target) <= 1) matches.push(rec);
+    if (d != null && Math.abs(d - target) <= 1) matches.push(url);
   }
-
   if (matches.length === 1) {
-    const u = matches[0].hd || matches[0].sd;
-    console.log(`[MetaVideoDownloader] Matched by duration ${target}s (unique):`, u);
-    return u;
+    console.log(`[MetaVideoDownloader] Matched by duration ${target}s (unique):`, matches[0]);
+    return matches[0];
   }
-
   if (matches.length > 1) {
-    // Disambiguate by exact resolution (videoWidth x videoHeight)
-    if (vw && vh) {
-      const exact = matches.filter((r) => r.w === vw && r.h === vh);
-      if (exact.length >= 1) {
-        const u = exact[0].hd || exact[0].sd;
-        console.log(`[MetaVideoDownloader] Matched by duration ${target}s + resolution ${vw}x${vh}:`, u);
-        return u;
-      }
-      // Fallback: match by orientation (portrait vs landscape)
-      const wantPortrait = vh > vw;
-      const oriented = matches.filter((r) => r.w && r.h && (r.h > r.w) === wantPortrait);
-      if (oriented.length >= 1) {
-        const u = oriented[0].hd || oriented[0].sd;
-        console.log(`[MetaVideoDownloader] Matched by duration ${target}s + orientation (${wantPortrait ? 'portrait' : 'landscape'}):`, u);
-        return u;
-      }
-    }
-    const u = matches[0].hd || matches[0].sd;
-    console.log(`[MetaVideoDownloader] Duration ${target}s matched ${matches.length} candidates (res ${vw}x${vh} not resolvable), using most recent`);
-    return u;
+    console.log(`[MetaVideoDownloader] Duration ${target}s matched ${matches.length} candidates, using most recent`);
+    return matches[0];
   }
-
   console.log('[MetaVideoDownloader] No captured URL matched duration', target);
   return null;
 }
@@ -425,7 +388,6 @@ function capturedUrlByDuration(videoElement) {
 async function getFacebookVideoUrl(videoElement) {
   const videoId = findFacebookVideoId(videoElement);
   console.log('[MetaVideoDownloader] Facebook video id:', videoId);
-  console.log('[MetaVideoDownloader] Clicked video resolution:', videoElement.videoWidth + 'x' + videoElement.videoHeight, 'duration:', videoElement.duration);
   console.log('[MetaVideoDownloader] Captured videos count:', capturedList.length);
   console.log('[MetaVideoDownloader] Captured videos keys:', Array.from(capturedVideos.keys()));
 

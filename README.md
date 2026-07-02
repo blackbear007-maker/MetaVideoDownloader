@@ -126,3 +126,19 @@ MIT 授權 - 歡迎修改和散布
 - 修復 injected.js JSON 解析大小限制問題（添加 1MB 限制）
 - 執行上架前審查，更新 PRE_RELEASE_REVIEW.md
 - 檢查上架前檢查清單，PNG 圖示已完成
+- 推送到 GitHub (https://github.com/blackbear007-maker/MetaVideoDownloader.git)
+- 修復頁面切換時下載錯誤影片的 bug（添加 URL 變更監聽器清空 capturedList）
+- 修復 Facebook Reel 下載錯誤影片的 bug（改進 Reel URL 正則表達式）
+- 修復 Facebook Reel 下載錯誤影片的 bug（對大響應使用 regex 掃描而非 JSON 解析）
+- 將所有日誌中的 [Threads Downloader] 改為 [MetaVideoDownloader]
+- 修復下載固定/錯誤影片的 bug（regexScan 關聯最近 video id、合併 hd/sd、調整 fallback 順序優先以 id 精準匹配）
+- 修復時序競態 bug（正確影片在點擊後才被捕獲）：下載改為 async，輪詢等待最多 3 秒讓對應 id 的捕獲到達
+- 修復動態影片 video id = null 抓錯的 bug：新增 React fiber props 走訪，從元件 props 提取 video id
+- 新增影片時長匹配（不依賴 Facebook id）：解析 fbcdn URL efg 參數的 duration_s，與點擊影片實際時長比對挑出正確影片
+- 新增 currentSrc 直取：blob/空 URL 時先 play() 促使載入，輪詢 videoElement.currentSrc，progressive 影片可直接取得精確 URL（免匹配）
+- 新增 React fiber 深度搜尋影片 URL：從點擊影片的元件 props/state 直接取得其 playable_url，即使該影片未被網路捕獲也能精確下載
+- 修復動態牆抓到兄弟影片的 bug：停用會向上爬樹的 fiber id 提取；改用 isolate-and-capture（暫停其他影片、強制播放點擊影片、取其 currentSrc 或播放後首個新捕獲）
+- 修復 pcb 假 id 的 bug：只接受純數字 video id，拒絕貼文區塊 id（pcb.*）
+- 新增解析度匹配：injected.js 捕獲影片 original_width/height，以點擊影片的 videoWidth×videoHeight 對時長相同的多候選做精準二次篩選（含方向備援）
+- Reel/watch 觀看者改用網址 id 優先：直接以 window.location 的 /reel/<id> 或 ?v=<id> 對應影片（最可靠）；大回應 warn 降為 log
+- 動態牆已緩衝影片改用 currentSrc 輪詢：強制播放後輪詢 currentSrc，直接接受點擊元素的 URL（移除解析度驗證，因為影片播放時尺寸可能不穩定）

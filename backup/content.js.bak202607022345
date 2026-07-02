@@ -320,11 +320,11 @@ function sleep(ms) {
 }
 
 // Isolate the clicked video (pause every other <video>), force it to play, and
-// poll its currentSrc. For progressive/buffered videos, the real fbcdn URL
-// appears directly on the element. Since this is the clicked element's own
-// currentSrc, it's inherently correct for that element (no need to validate
-// against external captures). We accept it immediately if it's a fbcdn URL.
+// return the URL that this specific element loads. For progressive videos this
+// is videoElement.currentSrc; for DASH/MSE it is the first NEW network capture
+// triggered by our play(). This ties the user's click to the correct URL.
 async function isolateAndCapture(videoElement) {
+  const before = capturedList.length;
   const others = Array.from(document.querySelectorAll('video')).filter((v) => v !== videoElement);
   others.forEach((v) => { try { v.pause(); } catch (e) {} });
 
@@ -335,11 +335,16 @@ async function isolateAndCapture(videoElement) {
   } catch (e) {}
 
   for (let i = 0; i < 20; i++) {
+    // Progressive videos expose the real URL directly on the element
     const cs = videoElement.currentSrc || videoElement.src;
-    // Accept any non-blob HTTP URL from this element (it's the clicked element's own URL)
-    if (cs && !cs.startsWith('blob:') && cs.indexOf('http') === 0) {
-      console.log('[MetaVideoDownloader] Got currentSrc from clicked element:', cs);
-      return cs;
+    if (cs && !cs.startsWith('blob:') && cs.indexOf('http') === 0) return cs;
+
+    // DASH/MSE: our play() triggers a fresh fetch that gets captured; since we
+    // paused all other videos, the newest capture is very likely this one.
+    if (capturedList.length > before) {
+      const rec = capturedList[capturedList.length - 1];
+      const u = rec.hd || rec.sd;
+      if (u) return u;
     }
     await sleep(150);
   }

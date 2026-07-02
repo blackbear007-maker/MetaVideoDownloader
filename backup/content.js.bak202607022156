@@ -76,8 +76,6 @@ window.addEventListener('message', (event) => {
     const existing = capturedVideos.get(record.id) || { id: record.id };
     if (record.hd) existing.hd = record.hd;
     if (record.sd) existing.sd = record.sd;
-    if (record.w) existing.w = record.w;
-    if (record.h) existing.h = record.h;
     capturedVideos.set(record.id, existing);
   }
   capturedList.push(record);
@@ -114,17 +112,6 @@ function decodeEscapedUrl(str) {
 
 // Try to find the Facebook video id near the clicked video element
 function findFacebookVideoId(videoElement) {
-  // Highest priority: the reels/watch viewer shows ONE video full-screen and the
-  // page URL is the current video's id. This is the most reliable signal.
-  const loc = window.location.pathname + window.location.search;
-  const locMatch = loc.match(/\/reel\/(\d{6,})/) ||
-                   loc.match(/\/videos\/(\d{6,})/) ||
-                   loc.match(/[?&]v=(\d{6,})/);
-  if (locMatch) {
-    console.log('[MetaVideoDownloader] Using video id from page URL:', locMatch[1]);
-    return locMatch[1];
-  }
-
   // Look for links containing a video/reel/watch id
   let node = videoElement;
   for (let i = 0; i < 12 && node; i++) {
@@ -136,10 +123,7 @@ function findFacebookVideoId(videoElement) {
       const m = href.match(/\/videos\/([^/?]+)/) ||
                 href.match(/\/reel\/([^/?]+)/) ||
                 href.match(/[?&]v=([^&]+)/);
-      // Only accept purely-numeric ids. Feed permalinks can yield post-block
-      // ids like "pcb.4574687359518023", which are NOT video ids and must be
-      // rejected (they cause the wrong video to be downloaded).
-      if (m && /^\d{6,}$/.test(m[1])) return m[1];
+      if (m) return m[1];
     }
     node = node.parentElement;
   }
@@ -147,80 +131,12 @@ function findFacebookVideoId(videoElement) {
   const dataNode = videoElement.closest('[data-video-id]');
   if (dataNode) return dataNode.getAttribute('data-video-id');
 
-  // NOTE: We intentionally do NOT climb the React fiber tree for an id here.
-  // In feeds, climbing up hits a container holding many videos and returns a
-  // sibling video's id, which then downloads the wrong video. Only trust ids
-  // that come from a permalink/data-attr directly associated with this element.
+  // Fallback: extract the video id from React fiber props (feed videos often
+  // have no permalink link, but their component props carry the video object)
+  const fiberId = findVideoIdFromReactFiber(videoElement);
+  if (fiberId) return fiberId;
 
   return null;
-}
-
-// One-time diagnostic dump of the clicked video's surroundings
-function logVideoDiagnostics(videoElement) {
-  try {
-    console.groupCollapsed('[MetaVideoDownloader][DIAG] video context');
-    console.log('poster:', videoElement.poster || '(none)');
-    console.log('video.currentSrc:', videoElement.currentSrc || '(none)');
-
-    // Nearby images (posters/covers), links, and structure
-    let node = videoElement;
-    for (let i = 0; i < 15 && node; i++) {
-      const tag = node.tagName ? node.tagName.toLowerCase() : '?';
-      const cls = (node.getAttribute && node.getAttribute('class')) || '';
-      const imgs = node.querySelectorAll ? node.querySelectorAll('img') : [];
-      const bgs = node.querySelectorAll ? node.querySelectorAll('[style*="background-image"]') : [];
-      const links = node.querySelectorAll ? node.querySelectorAll('a[href]') : [];
-      const al = node.getAttribute && node.getAttribute('aria-label');
-      console.log(`ancestor[${i}] <${tag} class="${cls.slice(0, 40)}"> imgs=${imgs.length} bgs=${bgs.length} links=${links.length}${al ? ' aria="' + al + '"' : ''}`);
-      if (imgs.length) {
-        console.log(`   imgs:`, Array.from(imgs).slice(0, 5).map((im) => im.currentSrc || im.src));
-      }
-      if (bgs.length) {
-        console.log(`   bgs:`, Array.from(bgs).slice(0, 5).map((b) => b.getAttribute('style')));
-      }
-      if (links.length) {
-        console.log(`   hrefs:`, Array.from(links).slice(0, 8).map((a) => a.getAttribute('href')));
-      }
-      node = node.parentElement;
-    }
-
-    // React fiber: find the first ancestor DOM node that has a fiber key,
-    // then report prop shapes and whether a video URL is present in props/state.
-    let fnode = videoElement;
-    let foundFiberKey = false;
-    for (let depth = 0; depth < 20 && fnode; depth++) {
-      const key = Object.keys(fnode).find((k) =>
-        k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$'));
-      if (key) {
-        foundFiberKey = true;
-        console.log(`fiber key found at ancestor[${depth}] <${fnode.tagName ? fnode.tagName.toLowerCase() : '?'}>`);
-        let fiber = fnode[key];
-        for (let i = 0; i < 20 && fiber; i++) {
-          const p = fiber.memoizedProps;
-          if (p && typeof p === 'object') {
-            const interesting = Object.keys(p).filter((k) => /id|video|media|url|story|feed/i.test(k));
-            if (interesting.length) {
-              console.log(`fiber[${i}] prop keys:`, interesting, '->',
-                interesting.map((k) => {
-                  const v = p[k];
-                  return v && typeof v === 'object' ? '{' + Object.keys(v).slice(0, 8).join(',') + '}' : v;
-                }));
-            }
-            const seen = new WeakSet();
-            const found = deepFindVideoUrl(p, 0, seen) || deepFindVideoUrl(fiber.memoizedState, 0, seen);
-            if (found) console.log(`fiber[${i}] >>> FOUND video url in props/state:`, found);
-          }
-          fiber = fiber.return;
-        }
-        break;
-      }
-      fnode = fnode.parentElement;
-    }
-    if (!foundFiberKey) console.log('no react fiber key found on video element or any ancestor');
-    console.groupEnd();
-  } catch (e) {
-    console.log('[MetaVideoDownloader][DIAG] error', e);
-  }
 }
 
 // Look for a large numeric video id in a React props object
@@ -261,89 +177,8 @@ function findVideoIdFromReactFiber(el) {
   return null;
 }
 
-// Deep-search a props/state object for this video's own fbcdn .mp4 URL
-function deepFindVideoUrl(obj, depth, seen) {
-  if (!obj || typeof obj !== 'object' || depth > 6) return null;
-  if (seen.has(obj)) return null;
-  seen.add(obj);
-
-  // Prefer explicit URL fields (highest quality first)
-  const fieldPriority = [
-    'browser_native_hd_url', 'playable_url_quality_hd', 'browser_native_sd_url',
-    'playable_url', 'progressive_url'
-  ];
-  for (const f of fieldPriority) {
-    const v = obj[f];
-    if (typeof v === 'string' && v.indexOf('http') === 0) return v;
-  }
-
-  for (const k in obj) {
-    let v;
-    try { v = obj[k]; } catch (e) { continue; }
-    if (typeof v === 'string') {
-      if (/^https:\/\/[^\s"']*fbcdn[^\s"']*\.mp4/.test(v)) return v;
-    } else if (v && typeof v === 'object') {
-      const r = deepFindVideoUrl(v, depth + 1, seen);
-      if (r) return r;
-    }
-  }
-  return null;
-}
-
-// Walk up the React fiber tree from the video element, deep-searching each
-// fiber's props/state for the clicked video's own playable URL. This gives the
-// exact URL for the clicked video even when it was never captured on the network.
-function findVideoUrlFromReactFiber(el) {
-  try {
-    let node = el;
-    for (let depth = 0; depth < 20 && node; depth++) {
-      const key = Object.keys(node).find((k) =>
-        k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$'));
-      if (key) {
-        let fiber = node[key];
-        for (let i = 0; i < 60 && fiber; i++) {
-          const seen = new WeakSet();
-          const url = deepFindVideoUrl(fiber.memoizedProps, 0, seen) ||
-                      deepFindVideoUrl(fiber.memoizedState, 0, seen);
-          if (url) return decodeEscapedUrl(url);
-          fiber = fiber.return;
-        }
-      }
-      node = node.parentElement;
-    }
-  } catch (e) {}
-  return null;
-}
-
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// Isolate the clicked video (pause every other <video>), force it to play, and
-// poll its currentSrc. For progressive/buffered videos, the real fbcdn URL
-// appears directly on the element. Since this is the clicked element's own
-// currentSrc, it's inherently correct for that element (no need to validate
-// against external captures). We accept it immediately if it's a fbcdn URL.
-async function isolateAndCapture(videoElement) {
-  const others = Array.from(document.querySelectorAll('video')).filter((v) => v !== videoElement);
-  others.forEach((v) => { try { v.pause(); } catch (e) {} });
-
-  try {
-    videoElement.muted = true;
-    const p = videoElement.play && videoElement.play();
-    if (p && p.catch) p.catch(() => {});
-  } catch (e) {}
-
-  for (let i = 0; i < 20; i++) {
-    const cs = videoElement.currentSrc || videoElement.src;
-    // Accept any non-blob HTTP URL from this element (it's the clicked element's own URL)
-    if (cs && !cs.startsWith('blob:') && cs.indexOf('http') === 0) {
-      console.log('[MetaVideoDownloader] Got currentSrc from clicked element:', cs);
-      return cs;
-    }
-    await sleep(150);
-  }
-  return null;
 }
 
 // Return the captured URL for a given id, if available
@@ -355,77 +190,10 @@ function capturedUrlById(videoId) {
   return null;
 }
 
-// Parse duration_s from the base64 "efg" param embedded in an fbcdn video URL
-function getUrlDurationSeconds(url) {
-  try {
-    const m = url.match(/[?&]efg=([^&]+)/);
-    if (!m) return null;
-    let b64 = decodeURIComponent(m[1]);
-    b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
-    while (b64.length % 4) b64 += '=';
-    const obj = JSON.parse(atob(b64));
-    if (typeof obj.duration_s === 'number') return obj.duration_s;
-  } catch (e) {}
-  return null;
-}
-
-// Find a captured URL whose embedded duration matches the clicked video's
-// duration, disambiguated by the clicked element's exact resolution when
-// multiple candidates share the same duration.
-function capturedUrlByDuration(videoElement) {
-  const dur = videoElement && videoElement.duration;
-  if (!dur || !isFinite(dur)) return null;
-  const target = Math.round(dur);
-  const vw = videoElement.videoWidth || 0;
-  const vh = videoElement.videoHeight || 0;
-
-  const matches = [];
-  for (let i = capturedList.length - 1; i >= 0; i--) {
-    const rec = capturedList[i];
-    const url = rec.hd || rec.sd;
-    if (!url) continue;
-    const d = getUrlDurationSeconds(url);
-    if (d != null && Math.abs(d - target) <= 1) matches.push(rec);
-  }
-
-  if (matches.length === 1) {
-    const u = matches[0].hd || matches[0].sd;
-    console.log(`[MetaVideoDownloader] Matched by duration ${target}s (unique):`, u);
-    return u;
-  }
-
-  if (matches.length > 1) {
-    // Disambiguate by exact resolution (videoWidth x videoHeight)
-    if (vw && vh) {
-      const exact = matches.filter((r) => r.w === vw && r.h === vh);
-      if (exact.length >= 1) {
-        const u = exact[0].hd || exact[0].sd;
-        console.log(`[MetaVideoDownloader] Matched by duration ${target}s + resolution ${vw}x${vh}:`, u);
-        return u;
-      }
-      // Fallback: match by orientation (portrait vs landscape)
-      const wantPortrait = vh > vw;
-      const oriented = matches.filter((r) => r.w && r.h && (r.h > r.w) === wantPortrait);
-      if (oriented.length >= 1) {
-        const u = oriented[0].hd || oriented[0].sd;
-        console.log(`[MetaVideoDownloader] Matched by duration ${target}s + orientation (${wantPortrait ? 'portrait' : 'landscape'}):`, u);
-        return u;
-      }
-    }
-    const u = matches[0].hd || matches[0].sd;
-    console.log(`[MetaVideoDownloader] Duration ${target}s matched ${matches.length} candidates (res ${vw}x${vh} not resolvable), using most recent`);
-    return u;
-  }
-
-  console.log('[MetaVideoDownloader] No captured URL matched duration', target);
-  return null;
-}
-
 // Extract a Facebook video URL from page scripts/data
 async function getFacebookVideoUrl(videoElement) {
   const videoId = findFacebookVideoId(videoElement);
   console.log('[MetaVideoDownloader] Facebook video id:', videoId);
-  console.log('[MetaVideoDownloader] Clicked video resolution:', videoElement.videoWidth + 'x' + videoElement.videoHeight, 'duration:', videoElement.duration);
   console.log('[MetaVideoDownloader] Captured videos count:', capturedList.length);
   console.log('[MetaVideoDownloader] Captured videos keys:', Array.from(capturedVideos.keys()));
 
@@ -483,24 +251,6 @@ async function getFacebookVideoUrl(videoElement) {
     }
   }
 
-  // 2.5) Match by the clicked video's duration (works without a Facebook id).
-  //      Poll briefly since the matching capture may arrive shortly after click.
-  {
-    let durUrl = capturedUrlByDuration(videoElement);
-    if (durUrl) return durUrl;
-    if (videoElement && isFinite(videoElement.duration)) {
-      try { videoElement.play && videoElement.play().catch(() => {}); } catch (e) {}
-      for (let i = 0; i < 15; i++) {
-        await sleep(200);
-        durUrl = capturedUrlByDuration(videoElement);
-        if (durUrl) {
-          console.log(`[MetaVideoDownloader] Duration match after ${((i + 1) * 200)}ms`);
-          return durUrl;
-        }
-      }
-    }
-  }
-
   // 3) Use most recently captured video (last resort - may be inaccurate in feeds)
   if (capturedList.length > 0) {
     for (let i = capturedList.length - 1; i >= 0; i--) {
@@ -548,29 +298,8 @@ async function getVideoUrl(videoElement) {
   if (!url || url.startsWith('blob:')) {
     console.log('[MetaVideoDownloader] URL is blob/empty, extracting from page data');
     if (platform === 'facebook') {
-      // Best method: read the clicked video's own URL from its React fiber props.
-      // This is exact for the clicked element and works even when the video was
-      // never captured on the network or has no id/poster.
-      const fiberUrl = findVideoUrlFromReactFiber(videoElement);
-      if (fiberUrl) {
-        console.log('[MetaVideoDownloader] Got URL from React fiber props:', fiberUrl);
-        return fiberUrl;
-      }
-
-      // Most reliable for feeds: isolate this element (pause all others), force
-      // it to play, and grab either its own currentSrc (progressive) or the
-      // FIRST NEW network capture that our play() triggers (DASH). The user's
-      // click gesture on THIS element is the only trustworthy correlation.
-      const isoUrl = await isolateAndCapture(videoElement);
-      if (isoUrl) {
-        console.log('[MetaVideoDownloader] Got URL via isolate-and-capture:', isoUrl);
-        return isoUrl;
-      }
-
-      if (!url || url.startsWith('blob:')) {
-        const fbUrl = await getFacebookVideoUrl(videoElement);
-        if (fbUrl) url = fbUrl;
-      }
+      const fbUrl = await getFacebookVideoUrl(videoElement);
+      if (fbUrl) url = fbUrl;
     }
   }
 

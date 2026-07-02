@@ -22,3 +22,163 @@
 - 檢查上架前檢查清單，PNG 圖示已完成
 - 審查結果：✅ APPROVED FOR RELEASE
 - 總評分：9.4/10
+
+2026-07-02 18:22 - 推送到 GitHub
+- 初始化 Git 倉庫
+- 添加遠程倉庫：https://github.com/blackbear007-maker/MetaVideoDownloader.git
+- 提交初始版本 v1.1.0
+- 成功推送到 master 分支
+
+2026-07-02 18:32 - 修復頁面切換時下載錯誤影片的 bug
+- 問題：從聊天記錄回到主頁後，下載的是聊天記錄中的影片而非主頁影片
+- 根因：capturedList 在頁面導航時不會清空
+- 修復：添加 URL 變更監聽器，當 URL 變更時清空 capturedList 和 capturedVideos
+- 備份 content.js 至 backup/ 資料夾
+
+2026-07-02 18:43 - 修復 Facebook Reel 下載錯誤影片的 bug
+- 問題：Facebook Reel 影片下載後不是原來的影片，下載到別的影片
+- 根因：Reel URL 正則表達式只匹配純數字，無法處理查詢參數和額外路徑段
+- 修復：改進正則表達式從 /(\d+)/ 改為 /([^/?]+)/，支持非數字字符和查詢參數
+- 備份 content.js 至 backup/ 資料夾
+
+2026-07-02 19:35 - 修復 Facebook Reel 下載錯誤影片的 bug（第二部分）
+- 問題：Reel 響應大小 2.3MB 超過 1MB 限制，導致影片 URL 未被捕獲
+- 根因：JSON 解析大小限制設置為 1MB，Reel 響應通常超過此限制
+- 修復：提高 JSON 解析大小限制從 1MB 改為 10MB
+- 備份 injected.js 至 backup/ 資料夾
+- 添加調試日誌以診斷 video id 匹配問題
+
+2026-07-02 19:44 - 統一日誌名稱為 [MetaVideoDownloader]
+- 問題：控制台日誌仍顯示舊名稱 [Threads Downloader]
+- 修復：將所有文件中的 [Threads Downloader] 改為 [MetaVideoDownloader]
+- 修改文件：content.js, injected.js, background.js
+- 備份文件至 backup/ 資料夾
+- chrome-extension://invalid/ 錯誤需要完全卸載並重新安裝擴充功能
+
+2026-07-02 19:59 - 修復 Facebook Reel 下載錯誤影片的 bug（第三部分）
+- 問題：提高 JSON 大小限制到 10MB 導致動態影片下載也變錯
+- 根因：大響應捕獲太多不相關影片，capturedList 混亂
+- 修復：對大響應（>1MB）使用 regex 掃描而非 JSON 解析，避免捕獲太多不相關影片
+- 備份 injected.js 至 backup/ 資料夾
+
+2026-07-02 21:37 - 修復下載固定/錯誤影片的 bug（systematic-debugging 第四部分）
+- 問題：Reel 與動態影片都下載成固定的那幾支影片
+- 根因（由日誌確認）：
+  1. regexScan（處理 >1MB 大響應）捕獲的 URL 全部 id=null，無法以 id 匹配
+  2. DOM 抓到的 video id 與捕獲的 id 對不上，永遠 fallback 到「最近捕獲」，抓到 FB 預載的固定影片
+- 修復：
+  1. injected.js regexScan：追蹤 JSON 中最近的 video id 並關聯到每個 URL
+  2. content.js：合併同 id 的 hd/sd（避免 sd 覆蓋 hd）
+  3. content.js：調整 fallback 順序，先用 video id 在頁面精準搜尋，找不到才退回「最近捕獲」
+- 備份 injected.js, content.js 至 backup/ 資料夾
+- 註：控制台 chrome-extension://invalid/ 為舊分頁殘留的失效 content script，開新分頁即消失
+
+2026-07-02 21:45 - 修復下載錯誤影片的 bug（systematic-debugging 第五部分：時序競態）
+- 問題：點下載時抓到最近影片，但正確影片 id 在「點擊後」才被捕獲
+- 根因（由日誌確認）：正確 video id 的網路捕獲晚於使用者點擊（race condition）
+  例：點擊時 id 2472605483235799 不在捕獲清單，下載後才出現該 id
+- 修復：
+  1. getFacebookVideoUrl 改為 async
+  2. 當 video id 已知但未捕獲時，先嘗試 play() 促使 FB 載入，並輪詢等待最多 ~3 秒
+  3. getVideoUrl / downloadVideo 一併改為 async
+- 備份 content.js 至 backup/ 資料夾
+
+2026-07-02 21:50 - 修復下載錯誤影片的 bug（systematic-debugging 第六部分：video id = null）
+- 問題：部分動態影片 Facebook video id = null，直接 fallback 到最近影片，抓錯
+- 根因（由日誌確認）：動態影片周圍無 /videos//reel/?v= 連結也無 data-video-id，
+  findFacebookVideoId 回傳 null，無法走 id 精準匹配
+- 修復：新增 React fiber props 走訪（findVideoIdFromReactFiber），
+  從 Facebook 元件 props 的 video/media 物件提取 video id
+- 備份 content.js 至 backup/ 資料夾
+
+2026-07-02 21:55 - 改用影片時長匹配（systematic-debugging 第七部分）
+- 問題：video id 仍為 null（連結/data/fiber 都取不到），每次下載同影片變不同影片
+- 新解法（不依賴 Facebook id）：
+  1. 從 fbcdn URL 的 efg(base64) 參數解析 duration_s
+  2. 讀取點擊 <video> 元素的實際 duration，兩者匹配（±1 秒）挑出正確影片
+  3. 含短暫輪詢等待捕獲到達
+- 另加入 [DIAG] 診斷日誌（poster/img/href/aria-label/fiber props keys）以備進一步分析
+- 備份 content.js 至 backup/ 資料夾
+
+2026-07-02 22:00 - 改用 currentSrc 直取（systematic-debugging 第八部分）
+- 由日誌確認：clicked video 幾乎無可識別資訊（poster/currentSrc none、無 fiber key），
+  且 duration 8s 有 3 個候選碰撞
+- 但下載到的是 progressive_h264（非 DASH），progressive 影片會把真實 fbcdn mp4 直接放在 <video>.currentSrc
+- 新方案：blob/空 URL 時，先 play() 促使載入，輪詢 videoElement.currentSrc，
+  若為非 blob 的 https fbcdn URL 直接使用（最精確、免匹配）
+- 強化 [DIAG]：加深至 15 層、記錄祖先 tag/class、背景圖 div，以備 DASH 情況分析縮圖匹配
+- 備份 content.js 至 backup/ 資料夾
+
+2026-07-02 22:20 - 改用 React fiber 深度搜尋影片 URL（systematic-debugging 第九部分）
+- 關鍵發現：點擊影片 duration=111 秒，但捕獲清單無 111 秒者 → 該影片根本沒被網路捕獲
+  → 任何匹配策略都無效，因為我們沒有它的 URL
+- 背景圖來自 static.xx.fbcdn.net（表情符號/圖示），非封面縮圖
+- 新方案：findVideoUrlFromReactFiber — 從 <video> 往上找到有 fiber key 的祖先，
+  深度搜尋 fiber.memoizedProps / memoizedState 中該影片自身的
+  playable_url / browser_native_hd_url / fbcdn .mp4 URL，直接取得精確 URL
+  （不需網路捕獲、不需 id/poster）
+- 在 getVideoUrl 中最優先使用此法
+- 強化 [DIAG]：走訪祖先找 fiber key、報告是否在 props/state 找到影片 URL
+- 備份 content.js 至 backup/ 資料夾
+
+2026-07-02 22:42 - 改用 isolate-and-capture + 停用 fiber id 爬升（systematic-debugging 第十部分）
+- 回歸問題：fiber id 向上爬升在動態牆會抓到「兄弟影片」的 id（例 995434229911841），
+  觸發 matched by id 下載錯誤影片；fiber URL 深搜在 props 找不到（FB 延遲載入）
+- 根本認知：向上爬樹會命中含多支影片的容器 → 拿到別支影片資料
+  唯一可信的關聯是「使用者點擊的那個元素本身」
+- 修復：
+  1. 停用 findFacebookVideoId 內的 fiber id 爬升（只信任 permalink/data-attr 的 id）
+  2. 新增 isolateAndCapture：暫停所有其他 <video>，強制播放點擊影片，
+     回傳其 currentSrc（progressive）或播放後首個新網路捕獲（DASH/MSE）
+  3. getVideoUrl 優先使用 isolate-and-capture
+- 備份 content.js 至 backup/ 資料夾
+
+2026-07-02 22:48 - 解析度匹配 + 修正 pcb 假 id（systematic-debugging 第十一部分）
+- 問題1：連結解析出 pcb.4574687359518023（貼文區塊 id，非 video id）→ 匹配錯誤
+  修復：findFacebookVideoId 只接受純數字 id（/^\d{6,}$/），拒絕 pcb.*
+- 問題2：isolate-and-capture 對「已完整緩衝的短 blob 影片」無效（不會觸發新網路請求）
+- 問題3：duration 3s 仍 3 候選碰撞
+  修復：injected.js 捕獲影片專屬 original_width/height（scan 與 regexScan 皆加），
+        content.js 以點擊 <video> 的 videoWidth×videoHeight 精準二次篩選；
+        若無精確解析度則以方向(直/橫)篩選
+- 新增日誌：點擊影片解析度與時長
+- 備份 content.js、injected.js 至 backup/ 資料夾
+
+2026-07-02 23:29 - Reel 改用網址 id 優先（systematic-debugging 第十二部分）
+- 專案：MetaVideoDownloader
+- 觀察：injected.js:112 那段是 console.warn（大回應改 regex 掃描）附帶堆疊，非錯誤 → 降為 console.log
+- Reel 觀看器特性：一次只有一支影片全螢幕，且網址即為當前影片 id（/reel/<id> 或 ?v=<id>）
+  → findFacebookVideoId 最優先用 window.location 的 reel/watch id（最可靠、免 DOM 猜測）
+- 新增日誌：Using video id from page URL
+- 備份 content.js、injected.js 至 backup/ 資料夾
+
+2026-07-02 23:45 - currentSrc 輪詢 + 解析度驗證（systematic-debugging 第十三部分）
+- 專案：MetaVideoDownloader
+- 動態牆問題：點擊影片 30 秒，捕獲清單無 30 秒 → 該影片根本沒被捕獲 → isolate-and-capture 對已緩衝影片無效（不會觸發新網路請求）
+- Reel 問題：isolate-and-capture 有輸出 URL，但無法確認正確性（缺少點擊影片 duration 日誌）
+- 根本解法：動態牆已緩衝影片播放時會直接顯示真實 currentSrc（fbcdn .mp4）
+  → 改回「強制播放後輪詢 currentSrc」，但加上解析度驗證：
+  只接受 videoWidth×videoHeight 與點擊影片一致的 currentSrc
+- isolateAndCapture 改為：暫停其他影片、強制播放點擊影片、輪詢 currentSrc，
+  若解析度匹配則接受；若無解析度資訊則退而接受（備援）
+- 新增日誌：Got currentSrc with matching resolution / Got currentSrc (no resolution validation)
+- 備份 content.js 至 backup/ 資料夾
+
+2026-07-03 00:05 - 移除解析度驗證（systematic-debugging 第十四部分）
+- 專案：MetaVideoDownloader
+- 日誌顯示：點擊影片 720x1280 duration: 44.9，捕獲清單 25 筆但無 45 秒影片
+- isolateAndCapture 沒有返回結果（沒有 Got currentSrc 日誌）→ 解析度驗證過於嚴格
+- 根本原因：影片播放時 videoWidth×videoHeight 可能因載入過程、自動旋轉、縮放而不穩定
+  → 即使 currentSrc 正確，也因解析度不匹配被拒絕
+- 解法：移除解析度驗證，直接接受點擊元素的 currentSrc（因為是該元素自身的 URL，本質上正確）
+- isolateAndCapture 改為：暫停其他影片、強制播放點擊影片、輪詢 currentSrc，
+  出現非 blob HTTP URL 即接受（不驗證解析度）
+- 新增日誌：Got currentSrc from clicked element
+- 備份 content.js 至 backup/ 資料夾
+
+2026-07-03 00:23 - Bug 修復驗證成功（systematic-debugging 第十五部分）
+- 專案：MetaVideoDownloader
+- 用戶回報：目前可正常下載（動態牆和 Reel 影片）
+- 驗證結果：移除解析度驗證後，isolateAndCapture 成功捕獲正確 URL
+- 上架前審查：PRE_RELEASE_REVIEW.md 更新為 APPROVED FOR RELEASE
+- 準備上架 Chrome Web Store
