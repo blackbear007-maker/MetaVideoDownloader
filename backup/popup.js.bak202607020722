@@ -1,0 +1,25 @@
+// Popup script for Threads Video Downloader
+
+document.addEventListener('DOMContentLoaded', () => {
+  const statusElement = document.getElementById('status');
+  const privacyLink = document.getElementById('privacyLink');
+
+  // Check if current tab is on Threads
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const currentTab = tabs[0];
+
+    if (currentTab.url && (currentTab.url.includes('threads.net') || currentTab.url.includes('threads.com') || currentTab.url.includes('facebook.com'))) {
+      statusElement.textContent = '✓ 準備就緒';
+      statusElement.className = 'status active';
+    } else {
+      statusElement.textContent = '不在 Threads 或 Facebook 網站';
+      statusElement.className = 'status inactive';
+    }
+  });
+
+  // Privacy policy link
+  privacyLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    chrome.tabs.create({ url: chrome.runtime.getURL('privacy.html') });
+  });
+});

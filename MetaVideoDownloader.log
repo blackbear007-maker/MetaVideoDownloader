@@ -1,0 +1,24 @@
+2026-07-02 07:21 - 專案更名為「Meta 影片下載器」
+- 更新 README.md 中的專案名稱和資料夾名稱
+- 更新 manifest.json 中的擴充功能名稱
+- 更新 popup.html 中的標題和顯示名稱
+- 更新 privacy.html 中的隱私權政策標題
+- 更新 popup.js 中的註解
+- 更新 PRE_RELEASE_REVIEW.md 中的報告標題
+
+2026-07-02 07:23 - 執行安全審計 (security-audit-skill)
+- 生成 SECURITY_AUDIT_REPORT_20260702.md
+- 審計結果：總評分 9.8/10，無重大漏洞
+- 發現 1 個中風險問題：postMessage 使用萬用字元 origin (injected.js line 17)
+- 發現 1 個低風險問題：JSON 解析無大小限制
+
+2026-07-02 07:25 - 修復安全問題
+- 修復 injected.js postMessage 萬用字元 origin 問題（改為 window.location.origin）
+- 修復 injected.js JSON 解析大小限制問題（添加 1MB 限制）
+- 備份 injected.js 至 backup/ 資料夾
+
+2026-07-02 07:32 - 執行上架前審查
+- 更新 PRE_RELEASE_REVIEW.md（版本 1.1.0，日期 2026-07-02）
+- 檢查上架前檢查清單，PNG 圖示已完成
+- 審查結果：✅ APPROVED FOR RELEASE
+- 總評分：9.4/10

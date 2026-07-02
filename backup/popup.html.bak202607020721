@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Threads & Facebook 影片下載器</title>
+  <style>
+    body {
+      width: 320px;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      margin: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .container {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      margin: 0 0 12px 0;
+      font-size: 18px;
+      color: #333;
+      text-align: center;
+    }
+
+    .status {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .status.active {
+      background: #dcfce7;
+      color: #15803d;
+    }
+
+    .status.inactive {
+      background: #fee2e2;
+      color: #dc2626;
+    }
+
+    .instructions {
+      font-size: 13px;
+      color: #666;
+      line-height: 1.5;
+    }
+
+    .instructions ol {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .instructions li {
+      margin-bottom: 6px;
+    }
+
+    .footer {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #e5e7eb;
+      font-size: 11px;
+      color: #999;
+      text-align: center;
+    }
+
+    .footer a {
+      color: #667eea;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📥 Threads & Facebook 影片下載器</h1>
+
+    <div id="status" class="status inactive">
+      不在 Threads 或 Facebook 網站
+    </div>
+
+    <div class="instructions">
+      <strong>使用方法：</strong>
+      <ol>
+        <li>前往 threads.net、threads.com 或 facebook.com</li>
+        <li>找到貼文或留言中的影片</li>
+        <li>點擊右上角的下載按鈕</li>
+        <li>開始下載</li>
+      </ol>
+    </div>
+
+    <div class="footer">
+      <a href="#" id="privacyLink">隱私權政策</a> | v1.1.0
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - Threads Video Downloader</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      line-height: 1.6;
+      color: #333;
+    }
+    
+    h1 {
+      color: #667eea;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 10px;
+    }
+    
+    h2 {
+      color: #555;
+      margin-top: 30px;
+    }
+    
+    ul {
+      padding-left: 20px;
+    }
+    
+    li {
+      margin-bottom: 8px;
+    }
+    
+    .highlight {
+      background: #f3f4f6;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy - Threads Video Downloader</h1>
+  
+  <p><strong>Last Updated:</strong> June 29, 2026</p>
+  
+  <h2>1. Information We Collect</h2>
+  
+  <div class="highlight">
+    <strong>Threads Video Downloader does NOT collect any personal data.</strong>
+  </div>
+  
+  <ul>
+    <li><strong>No User Data Collection:</strong> We do not collect, store, or transmit any personal information, browsing history, or user data.</li>
+    <li><strong>No Tracking:</strong> We do not use analytics, tracking pixels, or any form of user monitoring.</li>
+    <li><strong>No Account Information:</strong> We do not access or store your Threads account credentials or personal information.</li>
+  </ul>
+  
+  <h2>2. Permissions Required</h2>
+  
+  <p>This extension requires the following minimal permissions:</p>
+  
+  <ul>
+    <li><strong>contextMenus:</strong> To add a right-click menu option for downloading videos</li>
+    <li><strong>downloads:</strong> To initiate video downloads to your device</li>
+    <li><strong>activeTab:</strong> To access video URLs on the current Threads page only</li>
+    <li><strong>https://www.threads.net/*:</strong> To function only on Threads website</li>
+  </ul>
+  
+  <h2>3. How We Use Information</h2>
+  
+  <ul>
+    <li><strong>Video URLs:</strong> When you right-click to download, we only access the video URL from the current page to initiate the download.</li>
+    <li><strong>No Data Storage:</strong> Video URLs are not stored, logged, or transmitted to any server.</li>
+    <li><strong>Local Processing:</strong> All processing happens locally on your device.</li>
+  </ul>
+  
+  <h2>4. Data Sharing</h2>
+  
+  <div class="highlight">
+    <strong>We do NOT share any data with third parties.</strong>
+  </div>
+  
+  <ul>
+    <li>No data is sold, rented, or shared with advertisers</li>
+    <li>No data is shared with analytics companies</li>
+    <li>No data is shared with any third-party services</li>
+  </ul>
+  
+  <h2>5. Data Security</h2>
+  
+  <ul>
+    <li>No data is stored, so there is no data to secure</li>
+    <li>All operations are performed locally in your browser</li>
+    <li>No network requests are made to external servers (except the video download itself)</li>
+  </ul>
+  
+  <h2>6. Children's Privacy</h2>
+  
+  <p>This extension is not directed to children under 13. We do not knowingly collect any information from children.</p>
+  
+  <h2>7. Changes to This Policy</h2>
+  
+  <p>We may update this privacy policy from time to time. We will notify users of any material changes by updating the date at the top of this policy.</p>
+  
+  <h2>8. Contact Us</h2>
+  
+  <p>If you have questions about this privacy policy, please contact us through the Chrome Web Store.</p>
+  
+  <h2>9. Open Source</h2>
+  
+  <p>This extension is designed with transparency in mind. The source code is available for review to ensure our privacy commitments are upheld.</p>
+</body>
+</html>

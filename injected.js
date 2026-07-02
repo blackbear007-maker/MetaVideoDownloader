@@ -1,0 +1,160 @@
+// Injected script - runs in the page's MAIN world
+// Hooks fetch and XHR to capture real video URLs from Facebook's GraphQL responses
+
+(function () {
+  if (window.__threadsFbHookInstalled) return;
+  window.__threadsFbHookInstalled = true;
+
+  // HD-quality URL keys
+  const HD_KEYS = ['browser_native_hd_url', 'playable_url_quality_hd'];
+  // SD/generic URL keys
+  const SD_KEYS = ['browser_native_sd_url', 'playable_url'];
+
+  // Send a captured video record to the content script
+  function report(record) {
+    if (!record.hd && !record.sd) return;
+    try {
+      window.postMessage({ source: 'threads-fb-hook', payload: record }, window.location.origin);
+    } catch (e) {}
+  }
+
+  // Recursively walk an object looking for video URL containers
+  function scan(obj, depth) {
+    if (!obj || depth > 14) return;
+    if (typeof obj !== 'object') return;
+
+    let hd = null;
+    let sd = null;
+
+    // Legacy keys
+    for (const key of HD_KEYS) {
+      if (typeof obj[key] === 'string' && obj[key].startsWith('http')) hd = obj[key];
+    }
+    for (const key of SD_KEYS) {
+      if (typeof obj[key] === 'string' && obj[key].startsWith('http')) sd = obj[key];
+    }
+
+    // Current Facebook format: progressive_urls array
+    if (Array.isArray(obj.progressive_urls)) {
+      for (const item of obj.progressive_urls) {
+        if (!item || typeof item.progressive_url !== 'string') continue;
+        const quality = (item.metadata && item.metadata.quality) || '';
+        if (quality.toString().toUpperCase().indexOf('HD') !== -1) {
+          if (!hd) hd = item.progressive_url;
+        } else {
+          if (!sd) sd = item.progressive_url;
+        }
+      }
+    }
+
+    // Single progressive_url field
+    if (!sd && typeof obj.progressive_url === 'string' && obj.progressive_url.startsWith('http')) {
+      sd = obj.progressive_url;
+    }
+
+    if (hd || sd) {
+      const id = obj.id || obj.videoId || obj.video_id || obj.post_id || null;
+      report({ id: id ? String(id) : null, hd: hd, sd: sd });
+    }
+
+    // Recurse
+    if (Array.isArray(obj)) {
+      for (let i = 0; i < obj.length; i++) scan(obj[i], depth + 1);
+    } else {
+      for (const k in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, k)) {
+          const v = obj[k];
+          if (v && typeof v === 'object') scan(v, depth + 1);
+        }
+      }
+    }
+  }
+
+  // Extract URLs directly via regex as a robust fallback
+  function regexScan(text) {
+    const re = /"(browser_native_hd_url|playable_url_quality_hd|browser_native_sd_url|playable_url|progressive_url)"\s*:\s*"([^"]+)"/g;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const key = m[1];
+      let url = m[2];
+      try { url = JSON.parse('"' + url + '"'); } catch (e) { url = url.replace(/\\\//g, '/'); }
+      if (!url.startsWith('http')) continue;
+      const isHd = key.indexOf('hd') !== -1;
+      report({ id: null, hd: isHd ? url : null, sd: isHd ? null : url });
+    }
+  }
+
+  function tryParseAndScan(text) {
+    if (!text) return;
+    if (text.indexOf('playable_url') === -1 &&
+        text.indexOf('browser_native') === -1 &&
+        text.indexOf('progressive_url') === -1) {
+      return;
+    }
+
+    // Size limit to prevent DoS (1MB)
+    const MAX_SIZE = 1024 * 1024; // 1MB
+    if (text.length > MAX_SIZE) {
+      console.warn('[Threads Downloader] Response too large, skipping:', text.length);
+      return;
+    }
+
+    // Try whole text as single JSON
+    try {
+      scan(JSON.parse(text), 0);
+      return;
+    } catch (e) {}
+
+    // Try newline-delimited JSON objects
+    let parsedAny = false;
+    const parts = text.split('\n');
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
+      try {
+        scan(JSON.parse(trimmed), 0);
+        parsedAny = true;
+      } catch (e) {}
+    }
+
+    // If JSON parsing failed entirely, use regex fallback
+    if (!parsedAny) {
+      regexScan(text);
+    }
+  }
+
+  // Hook fetch
+  const origFetch = window.fetch;
+  window.fetch = function (...args) {
+    return origFetch.apply(this, args).then((response) => {
+      try {
+        const clone = response.clone();
+        const ct = clone.headers.get('content-type') || '';
+        if (ct.indexOf('json') !== -1 || ct.indexOf('javascript') !== -1 || ct === '') {
+          clone.text().then(tryParseAndScan).catch(() => {});
+        }
+      } catch (e) {}
+      return response;
+    });
+  };
+
+  // Hook XHR
+  const origOpen = XMLHttpRequest.prototype.open;
+  const origSend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.open = function (method, url) {
+    this.__fbHookUrl = url;
+    return origOpen.apply(this, arguments);
+  };
+  XMLHttpRequest.prototype.send = function () {
+    this.addEventListener('load', function () {
+      try {
+        if (this.responseType === '' || this.responseType === 'text') {
+          tryParseAndScan(this.responseText);
+        }
+      } catch (e) {}
+    });
+    return origSend.apply(this, arguments);
+  };
+
+  console.log('[Threads Downloader] Facebook network hook installed');
+})();
