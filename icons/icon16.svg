@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
   <rect width="16" height="16" rx="3" fill="#667eea"/>
-  <!-- Single unified shape: Arrow shaft with F bars (no T top bar) -->
-  <path d="M8 3 L8 13 M5 10 L8 13 L11 10 M8 6 L11 6 M8 8 L11 8" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Unified shape: Arrow shaft starts at T top, T top bar extends left, F bars extend right -->
+  <path d="M8 6 L8 13 M5 10 L8 13 L11 10 M8 6 L5 6 M8 6 L11 6 M8 8 L11 8" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

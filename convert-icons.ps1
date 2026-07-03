@@ -24,13 +24,13 @@ function Create-PngIcon {
 
     # Calculate positions based on icon size
     $centerX = [int]($Size * 0.5)
-    $topY = [int]($Size * 0.18)
+    $tTopY = [int]($Size * 0.35)  # Arrow shaft starts at T top
     $bottomY = [int]($Size * 0.82)
     $arrowHeadY = [int]($Size * 0.68)
     $arrowWidth = [int]($Size * 0.12)
 
-    # Draw central vertical line (arrow shaft)
-    $graphics.DrawLine($pen, $centerX, $topY, $centerX, $bottomY)
+    # Draw central vertical line (arrow shaft) starting from T top
+    $graphics.DrawLine($pen, $centerX, $tTopY, $centerX, $bottomY)
 
     # Draw arrow head (downward V) at bottom
     $arrowHeadPoints = @(
@@ -39,6 +39,10 @@ function Create-PngIcon {
         [System.Drawing.Point]::new($centerX + $arrowWidth, $arrowHeadY)
     )
     $graphics.DrawLines($pen, $arrowHeadPoints)
+
+    # Draw T top bar (extend left from center)
+    $tLeftX = [int]($Size * 0.35)
+    $graphics.DrawLine($pen, $centerX, $tTopY, $tLeftX, $tTopY)  # T top bar (left from center)
 
     # Draw F horizontal bars (extend right from center)
     $fTopY = [int]($Size * 0.35)
