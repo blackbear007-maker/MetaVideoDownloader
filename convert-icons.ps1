@@ -40,17 +40,12 @@ function Create-PngIcon {
     )
     $graphics.DrawLines($pen, $arrowHeadPoints)
 
-    # Draw F horizontal bars (extend right from center - flipped)
+    # Draw F horizontal bars (extend right from center)
     $fTopY = [int]($Size * 0.35)
     $fMidY = [int]($Size * 0.47)
     $fRightX = [int]($Size * 0.65)
     $graphics.DrawLine($pen, $centerX, $fTopY, $fRightX, $fTopY)  # F top bar (right from center)
     $graphics.DrawLine($pen, $centerX, $fMidY, $fRightX, $fMidY)  # F middle bar (right from center)
-
-    # Draw T horizontal bar (extend left from center - flipped)
-    $tTopY = [int]($Size * 0.35)
-    $tLeftX = [int]($Size * 0.35)
-    $graphics.DrawLine($pen, $centerX, $tTopY, $tLeftX, $tTopY)  # T top bar (left from center)
 
     # Save as PNG
     $bitmap.Save($OutputPath, [System.Drawing.Imaging.ImageFormat]::Png)
