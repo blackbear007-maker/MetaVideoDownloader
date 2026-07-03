@@ -22,12 +22,12 @@ function Create-PngIcon {
     $whiteColor = [System.Drawing.Color]::White
     $pen = New-Object System.Drawing.Pen($whiteColor, [int]($Size * 0.06))
 
-    # Calculate positions based on icon size
+    # Calculate positions based on icon size (70% of canvas)
     $centerX = [int]($Size * 0.5)
-    $tTopY = [int]($Size * 0.35)  # Arrow shaft starts at T top
-    $bottomY = [int]($Size * 0.82)
-    $arrowHeadY = [int]($Size * 0.68)
-    $arrowWidth = [int]($Size * 0.12)
+    $tTopY = [int]($Size * 0.15)  # Arrow shaft starts at T top (70% coverage)
+    $bottomY = [int]($Size * 0.85)
+    $arrowHeadY = [int]($Size * 0.70)
+    $arrowWidth = [int]($Size * 0.25)
 
     # Draw central vertical line (arrow shaft) starting from T top
     $graphics.DrawLine($pen, $centerX, $tTopY, $centerX, $bottomY)
@@ -41,13 +41,13 @@ function Create-PngIcon {
     $graphics.DrawLines($pen, $arrowHeadPoints)
 
     # Draw T top bar (extend left from center)
-    $tLeftX = [int]($Size * 0.35)
+    $tLeftX = [int]($Size * 0.25)
     $graphics.DrawLine($pen, $centerX, $tTopY, $tLeftX, $tTopY)  # T top bar (left from center)
 
     # Draw F horizontal bars (extend right from center)
-    $fTopY = [int]($Size * 0.35)
-    $fMidY = [int]($Size * 0.47)
-    $fRightX = [int]($Size * 0.65)
+    $fTopY = [int]($Size * 0.15)
+    $fMidY = [int]($Size * 0.38)
+    $fRightX = [int]($Size * 0.75)
     $graphics.DrawLine($pen, $centerX, $fTopY, $fRightX, $fTopY)  # F top bar (right from center)
     $graphics.DrawLine($pen, $centerX, $fMidY, $fRightX, $fMidY)  # F middle bar (right from center)
 

@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
   <rect width="128" height="128" rx="20" fill="#667eea"/>
-  <!-- Unified shape: Arrow shaft starts at T top, T top bar extends left, F bars extend right -->
-  <path d="M64 45 L64 95 M48 75 L64 95 L80 75 M64 45 L48 45 M64 45 L80 45 M64 60 L80 60" stroke="white" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Unified shape: Arrow shaft starts at T top, T top bar extends left, F bars extend right (70% of canvas) -->
+  <path d="M64 20 L64 108 M32 88 L64 108 L96 88 M64 20 L32 20 M64 20 L96 20 M64 50 L96 50" stroke="white" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
