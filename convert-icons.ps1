@@ -18,9 +18,9 @@ function Create-PngIcon {
     $backgroundColor = [System.Drawing.Color]::FromArgb(102, 126, 234) # #667eea
     $graphics.Clear($backgroundColor)
 
-    # White color for the arrow
+    # White color for the arrow (2x stroke width)
     $whiteColor = [System.Drawing.Color]::White
-    $pen = New-Object System.Drawing.Pen($whiteColor, [int]($Size * 0.06))
+    $pen = New-Object System.Drawing.Pen($whiteColor, [int]($Size * 0.12))
 
     # Calculate positions based on icon size (70% of canvas)
     $centerX = [int]($Size * 0.5)
