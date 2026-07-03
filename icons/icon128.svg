@@ -1,4 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
   <rect width="128" height="128" rx="20" fill="#667eea"/>
-  <path d="M38 32v64l56-32z" fill="white"/>
+  <text x="32" y="75" font-family="Arial, sans-serif" font-size="40" font-weight="bold" fill="white">F</text>
+  <path d="M58 55l10 10 10-10" stroke="white" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="68" y1="65" x2="68" y2="85" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <text x="80" y="75" font-family="Arial, sans-serif" font-size="40" font-weight="bold" fill="white">T</text>
 </svg>

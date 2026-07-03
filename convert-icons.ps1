@@ -1,5 +1,5 @@
 # Convert SVG icons to PNG format for Chrome Extension
-# This script creates simple PNG icons from the SVG designs
+# This script creates PNG icons with F T download symbol design
 
 Add-Type -AssemblyName System.Drawing
 
@@ -8,37 +8,63 @@ function Create-PngIcon {
         [int]$Size,
         [string]$OutputPath
     )
-    
+
     # Create bitmap
     $bitmap = New-Object System.Drawing.Bitmap $Size, $Size
     $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
     $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-    
-    # Background color (purple gradient-like solid color)
+    $graphics.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAlias
+
+    # Background color (purple)
     $backgroundColor = [System.Drawing.Color]::FromArgb(102, 126, 234) # #667eea
     $graphics.Clear($backgroundColor)
-    
-    # Draw play button (white triangle)
-    $margin = [int]($Size * 0.25)
-    $playSize = $Size - (2 * $margin)
-    
-    # Triangle points
-    $points = @(
-        [System.Drawing.Point]::new($margin, $margin),
-        [System.Drawing.Point]::new($Size - $margin, [int]($Size / 2)),
-        [System.Drawing.Point]::new($margin, $Size - $margin)
+
+    # Calculate font size based on icon size
+    $fontSize = [int]($Size * 0.35)
+    $font = New-Object System.Drawing.Font("Arial", $fontSize, [System.Drawing.FontStyle]::Bold)
+
+    # White color for text and symbols
+    $whiteColor = [System.Drawing.Color]::White
+    $brush = New-Object System.Drawing.SolidBrush $whiteColor
+    $pen = New-Object System.Drawing.Pen($whiteColor, [int]($Size * 0.03))
+
+    # Calculate positions
+    $fX = [int]($Size * 0.22)
+    $tX = [int]($Size * 0.68)
+    $textY = [int]($Size * 0.65)
+
+    # Draw F
+    $graphics.DrawString("F", $font, $brush, $fX, $textY)
+
+    # Draw download arrow in the middle
+    $arrowCenterX = [int]($Size * 0.5)
+    $arrowTopY = [int]($Size * 0.35)
+    $arrowBottomY = [int]($Size * 0.75)
+    $arrowWidth = [int]($Size * 0.12)
+
+    # Arrow head (downward V)
+    $arrowHeadPoints = @(
+        [System.Drawing.Point]::new($arrowCenterX - $arrowWidth, $arrowTopY),
+        [System.Drawing.Point]::new($arrowCenterX, $arrowTopY + $arrowWidth),
+        [System.Drawing.Point]::new($arrowCenterX + $arrowWidth, $arrowTopY)
     )
-    
-    $playColor = [System.Drawing.Color]::White
-    $brush = New-Object System.Drawing.SolidBrush $playColor
-    $graphics.FillPolygon($brush, $points)
-    
+    $graphics.DrawLines($pen, $arrowHeadPoints)
+
+    # Arrow shaft (vertical line)
+    $graphics.DrawLine($pen, $arrowCenterX, $arrowTopY + $arrowWidth, $arrowCenterX, $arrowBottomY)
+
+    # Draw T
+    $graphics.DrawString("T", $font, $brush, $tX, $textY)
+
     # Save as PNG
     $bitmap.Save($OutputPath, [System.Drawing.Imaging.ImageFormat]::Png)
-    
+
     # Cleanup
     $graphics.Dispose()
     $bitmap.Dispose()
+    $font.Dispose()
+    $brush.Dispose()
+    $pen.Dispose()
 }
 
 # Use current directory for icons
