@@ -32,7 +32,7 @@ function Create-PngIcon {
     # Draw central vertical line (arrow shaft)
     $graphics.DrawLine($pen, $centerX, $topY, $centerX, $bottomY)
 
-    # Draw arrow head (downward V)
+    # Draw arrow head (downward V) at bottom
     $arrowHeadPoints = @(
         [System.Drawing.Point]::new($centerX - $arrowWidth, $arrowHeadY),
         [System.Drawing.Point]::new($centerX, $bottomY),
@@ -40,17 +40,17 @@ function Create-PngIcon {
     )
     $graphics.DrawLines($pen, $arrowHeadPoints)
 
-    # Draw F shape on the left
+    # Draw F horizontal bars (extend left from center)
     $fTopY = [int]($Size * 0.35)
     $fMidY = [int]($Size * 0.47)
     $fLeftX = [int]($Size * 0.35)
-    $graphics.DrawLine($pen, $fLeftX, $fTopY, $centerX, $fTopY)  # F top bar
-    $graphics.DrawLine($pen, $fLeftX, $fMidY, [int]($Size * 0.45), $fMidY)  # F middle bar
+    $graphics.DrawLine($pen, $centerX, $fTopY, $fLeftX, $fTopY)  # F top bar (left from center)
+    $graphics.DrawLine($pen, $centerX, $fMidY, $fLeftX, $fMidY)  # F middle bar (left from center)
 
-    # Draw T shape on the right
+    # Draw T horizontal bar (extend right from center)
     $tTopY = [int]($Size * 0.35)
     $tRightX = [int]($Size * 0.65)
-    $graphics.DrawLine($pen, $centerX, $tTopY, $tRightX, $tTopY)  # T top bar
+    $graphics.DrawLine($pen, $centerX, $tTopY, $tRightX, $tTopY)  # T top bar (right from center)
 
     # Save as PNG
     $bitmap.Save($OutputPath, [System.Drawing.Imaging.ImageFormat]::Png)

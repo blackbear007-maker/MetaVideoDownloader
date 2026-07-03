@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
   <rect width="128" height="128" rx="20" fill="#667eea"/>
-  <!-- Unified arrow that forms F and T -->
-  <path d="M64 25 L64 95 M48 75 L64 95 L80 75 M48 45 L64 45 M48 60 L58 60 M70 45 L70 95" stroke="white" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Unified arrow: central vertical line, F extends left, T extends right, arrow head at bottom -->
+  <path d="M64 25 L64 95 M48 75 L64 95 L80 75 M64 45 L48 45 M64 60 L48 60 M64 45 L80 45" stroke="white" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
