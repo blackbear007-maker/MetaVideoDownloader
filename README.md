@@ -1,6 +1,8 @@
-# Meta 影片下載器 Chrome 擴充功能
+# 影片下載器 for Facebook & Threads（Chrome 擴充功能）
 
 一個可以一鍵下載 Threads 和 Facebook 貼文和留言中影片的 Chrome 擴充功能。
+
+> 本專案為獨立開發，與 Meta Platforms, Inc.、Facebook 或 Threads 無任何關聯，亦未獲其背書。
 
 ## 功能特色
 
@@ -26,9 +28,9 @@
 
 ## 使用方法
 
-1. 前往 [threads.net](https://www.threads.net) 或 [threads.com](https://www.threads.com)
-2. 找到想要下載的影片或圖片或圖片（在貼文或留言中）
-3. 影片或圖片或圖片右上角會出現下載按鈕
+1. 前往 [threads.net](https://www.threads.net)、[threads.com](https://www.threads.com) 或 [facebook.com](https://www.facebook.com)
+2. 找到想要下載的影片（在貼文或留言中）
+3. 影片右上角會出現下載按鈕
 4. 點擊按鈕下載
 5. 選擇儲存位置
 
@@ -36,8 +38,10 @@
 
 此擴充功能需要最小權限：
 
-- **downloads**: 用於啟動檔案下載
-- **https://www.threads.net/** 和 **https://www.threads.com/**: 僅在 Threads 網站上運作
+- **downloads**: 用於啟動檔案下載（會跳出另存新檔對話框）
+- **https://www.threads.net/**、**https://www.threads.com/** 和 **https://*.facebook.com/**: 僅在 Threads 與 Facebook 網站上運作
+
+Facebook 影片使用 blob 網址，無法直接下載。擴充功能會在 facebook.com 頁面內（本機）檢查頁面內容與 Facebook 網頁本身收到的網路回應，從中找出影片的真實網址；此過程不會記錄或傳送任何資料。
 
 ## 隱私權
 
@@ -76,7 +80,9 @@ MetaVideoDownloader/
 ├── content.js          # 影片偵測腳本
 ├── popup.html          # 擴充功能彈出視窗 UI
 ├── popup.js            # 彈出視窗邏輯
+├── injected.js         # Facebook 影片網址擷取（頁面 MAIN world）
 ├── privacy.html        # 隱私權政策頁面
+├── package-extension.ps1 # 打包上架用 ZIP
 ├── icons/              # 擴充功能圖示
 │   ├── icon16.png
 │   ├── icon48.png
@@ -95,11 +101,11 @@ MetaVideoDownloader/
 
 提交到 Chrome Web Store 前：
 
-1. 將 SVG 圖示轉換為 PNG 格式
-2. 檢視隱私權政策
+1. 執行 `.\package-extension.ps1` 產生 ZIP（請勿使用 Compress-Archive，它會產生反斜線路徑，商店無法讀取圖示）
+2. 檢視隱私權政策，並在開發者後台填入公開網址（例如 GitHub 上的 privacy.html）
 3. 測試所有功能
 4. 確認 Manifest V3 合規
-5. 準備截圖和宣傳素材
+5. 準備 1280x800 截圖和宣傳素材
 
 ## 授權
 
@@ -142,3 +148,22 @@ MIT 授權 - 歡迎修改和散布
 - 新增解析度匹配：injected.js 捕獲影片 original_width/height，以點擊影片的 videoWidth×videoHeight 對時長相同的多候選做精準二次篩選（含方向備援）
 - Reel/watch 觀看者改用網址 id 優先：直接以 window.location 的 /reel/<id> 或 ?v=<id> 對應影片（最可靠）；大回應 warn 降為 log
 - 動態牆已緩衝影片改用 currentSrc 輪詢：強制播放後輪詢 currentSrc，直接接受點擊元素的 URL（移除解析度驗證，因為影片播放時尺寸可能不穩定）
+
+### 2026-07-03 (v1.2.0)
+- Bug 修復驗證成功：動態牆和 Reel 影片下載功能正常
+- 移除 isolateAndCapture 中的解析度驗證（影片播放時尺寸可能不穩定）
+- 上架前審查完成：PRE_RELEASE_REVIEW.md 更新為 APPROVED FOR RELEASE
+- 更新 manifest.json 版本號至 1.2.0
+- 打包專案為 MetaVideoDownloader_v1.2.0.zip
+- 準備提交至 Chrome Web Store
+
+### 2026-11-06 (v1.2.0 上架前修正)
+- 上架前審查：發現 zip 反斜線路徑、privacy.html 與實際權限不符、名稱含 Meta 商標三項阻擋問題
+- 擴充功能更名為「影片下載器 for Facebook & Threads」，描述與 popup 加註「非 Meta 官方產品」
+- 重寫 privacy.html：移除不存在的 contextMenus / activeTab 說明，補上 threads.com、*.facebook.com 與 Facebook 網路回應檢查的揭露，加上中文摘要與 GitHub 連結
+- popup 版本號改由 chrome.runtime.getManifest() 取得，不再手寫
+- background.js 新增下載網址驗證：僅接受 https 且主機為 fbcdn.net / cdninstagram.com / facebook.com / threads.net / threads.com
+- manifest 精簡 host_permissions 與 content_scripts matches（*.facebook.com 已涵蓋 www 與 web 子網域）
+- content.js 移除未使用的 logVideoDiagnostics、extractVideoIdFromProps、findVideoIdFromReactFiber
+- package-extension.ps1 改用 bsdtar 打包（正斜線路徑）、版本號讀自 manifest、不再打包 SVG
+- 新增 .gitignore 忽略 *.zip

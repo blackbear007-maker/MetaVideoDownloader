@@ -1,16 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "Meta 影片下載器",
-  "version": "1.1.0",
-  "description": "一鍵下載 Threads 和 Facebook 貼文和留言中的影片",
+  "name": "影片下載器 for Facebook & Threads",
+  "version": "1.2.0",
+  "description": "一鍵下載 Threads 和 Facebook 貼文和留言中的影片（非 Meta 官方產品）",
   "permissions": [
     "downloads"
   ],
   "host_permissions": [
     "https://www.threads.net/*",
     "https://www.threads.com/*",
-    "https://www.facebook.com/*",
-    "https://web.facebook.com/*",
     "https://*.facebook.com/*"
   ],
   "background": {
@@ -21,8 +19,6 @@
       "matches": [
         "https://www.threads.net/*",
         "https://www.threads.com/*",
-        "https://www.facebook.com/*",
-        "https://web.facebook.com/*",
         "https://*.facebook.com/*"
       ],
       "js": ["content.js"],
@@ -33,8 +29,6 @@
     {
       "resources": ["injected.js"],
       "matches": [
-        "https://www.facebook.com/*",
-        "https://web.facebook.com/*",
         "https://*.facebook.com/*"
       ]
     }

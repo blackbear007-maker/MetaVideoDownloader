@@ -1,5 +1,5 @@
-// Content script for Threads Video Downloader
-// Adds download button to videos on Threads
+// Content script for Video Downloader for Facebook & Threads
+// Adds a download button to videos on Threads and Facebook
 
 // Add CSS styles for download button
 const style = document.createElement('style');
@@ -152,112 +152,6 @@ function findFacebookVideoId(videoElement) {
   // sibling video's id, which then downloads the wrong video. Only trust ids
   // that come from a permalink/data-attr directly associated with this element.
 
-  return null;
-}
-
-// One-time diagnostic dump of the clicked video's surroundings
-function logVideoDiagnostics(videoElement) {
-  try {
-    console.groupCollapsed('[MetaVideoDownloader][DIAG] video context');
-    console.log('poster:', videoElement.poster || '(none)');
-    console.log('video.currentSrc:', videoElement.currentSrc || '(none)');
-
-    // Nearby images (posters/covers), links, and structure
-    let node = videoElement;
-    for (let i = 0; i < 15 && node; i++) {
-      const tag = node.tagName ? node.tagName.toLowerCase() : '?';
-      const cls = (node.getAttribute && node.getAttribute('class')) || '';
-      const imgs = node.querySelectorAll ? node.querySelectorAll('img') : [];
-      const bgs = node.querySelectorAll ? node.querySelectorAll('[style*="background-image"]') : [];
-      const links = node.querySelectorAll ? node.querySelectorAll('a[href]') : [];
-      const al = node.getAttribute && node.getAttribute('aria-label');
-      console.log(`ancestor[${i}] <${tag} class="${cls.slice(0, 40)}"> imgs=${imgs.length} bgs=${bgs.length} links=${links.length}${al ? ' aria="' + al + '"' : ''}`);
-      if (imgs.length) {
-        console.log(`   imgs:`, Array.from(imgs).slice(0, 5).map((im) => im.currentSrc || im.src));
-      }
-      if (bgs.length) {
-        console.log(`   bgs:`, Array.from(bgs).slice(0, 5).map((b) => b.getAttribute('style')));
-      }
-      if (links.length) {
-        console.log(`   hrefs:`, Array.from(links).slice(0, 8).map((a) => a.getAttribute('href')));
-      }
-      node = node.parentElement;
-    }
-
-    // React fiber: find the first ancestor DOM node that has a fiber key,
-    // then report prop shapes and whether a video URL is present in props/state.
-    let fnode = videoElement;
-    let foundFiberKey = false;
-    for (let depth = 0; depth < 20 && fnode; depth++) {
-      const key = Object.keys(fnode).find((k) =>
-        k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$'));
-      if (key) {
-        foundFiberKey = true;
-        console.log(`fiber key found at ancestor[${depth}] <${fnode.tagName ? fnode.tagName.toLowerCase() : '?'}>`);
-        let fiber = fnode[key];
-        for (let i = 0; i < 20 && fiber; i++) {
-          const p = fiber.memoizedProps;
-          if (p && typeof p === 'object') {
-            const interesting = Object.keys(p).filter((k) => /id|video|media|url|story|feed/i.test(k));
-            if (interesting.length) {
-              console.log(`fiber[${i}] prop keys:`, interesting, '->',
-                interesting.map((k) => {
-                  const v = p[k];
-                  return v && typeof v === 'object' ? '{' + Object.keys(v).slice(0, 8).join(',') + '}' : v;
-                }));
-            }
-            const seen = new WeakSet();
-            const found = deepFindVideoUrl(p, 0, seen) || deepFindVideoUrl(fiber.memoizedState, 0, seen);
-            if (found) console.log(`fiber[${i}] >>> FOUND video url in props/state:`, found);
-          }
-          fiber = fiber.return;
-        }
-        break;
-      }
-      fnode = fnode.parentElement;
-    }
-    if (!foundFiberKey) console.log('no react fiber key found on video element or any ancestor');
-    console.groupEnd();
-  } catch (e) {
-    console.log('[MetaVideoDownloader][DIAG] error', e);
-  }
-}
-
-// Look for a large numeric video id in a React props object
-function extractVideoIdFromProps(props) {
-  if (!props || typeof props !== 'object') return null;
-  const idKeys = ['videoID', 'videoId', 'video_id'];
-  for (const k of idKeys) {
-    if (typeof props[k] === 'string' && /^\d{6,}$/.test(props[k])) return props[k];
-  }
-  for (const objKey of ['video', 'media']) {
-    const obj = props[objKey];
-    if (obj && typeof obj === 'object' && typeof obj.id === 'string' && /^\d{6,}$/.test(obj.id)) {
-      return obj.id;
-    }
-  }
-  return null;
-}
-
-// Walk up the React fiber tree from the video element looking for the video id
-function findVideoIdFromReactFiber(el) {
-  try {
-    let node = el;
-    for (let depth = 0; depth < 15 && node; depth++) {
-      const key = Object.keys(node).find((k) =>
-        k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$'));
-      if (key) {
-        let fiber = node[key];
-        for (let i = 0; i < 40 && fiber; i++) {
-          const id = extractVideoIdFromProps(fiber.memoizedProps) ||
-                     extractVideoIdFromProps(fiber.pendingProps);
-          if (id) return id;
-          fiber = fiber.return;
-        }
-      }
-      node = node.parentElement;
-    }
-  } catch (e) {}
   return null;
 }
 

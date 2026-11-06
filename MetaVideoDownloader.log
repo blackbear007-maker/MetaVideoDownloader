@@ -182,3 +182,16 @@
 - 驗證結果：移除解析度驗證後，isolateAndCapture 成功捕獲正確 URL
 - 上架前審查：PRE_RELEASE_REVIEW.md 更新為 APPROVED FOR RELEASE
 - 準備上架 Chrome Web Store
+
+2026-07-03 14:26 - 封裝上架準備
+- 更新 manifest.json 版本號從 1.1.0 到 1.2.0
+- 打包專案為 MetaVideoDownloader_v1.2.0.zip
+- 包含檔案：manifest.json, background.js, content.js, injected.js, popup.html, popup.js, privacy.html, icons/
+- 準備提交至 Chrome Web Store
+
+2026-11-06 - 上架前審查與修正
+- 審查結果：3 項阻擋（zip 反斜線路徑、privacy.html 不符、名稱含 Meta 商標）
+- 更名為「影片下載器 for Facebook & Threads」
+- 重寫 privacy.html、popup 版本號改讀 manifest、background.js 加入下載網址驗證
+- 精簡 host_permissions、移除 content.js 死碼
+- package-extension.ps1 改用 bsdtar，重新產生 MetaVideoDownloader_v1.2.0.zip

@@ -1,8 +1,12 @@
-// Popup script for Meta Video Downloader
+// Popup script for Video Downloader for Facebook & Threads
 
 document.addEventListener('DOMContentLoaded', () => {
   const statusElement = document.getElementById('status');
   const privacyLink = document.getElementById('privacyLink');
+  const versionElement = document.getElementById('version');
+
+  // Show version from manifest so it never drifts
+  versionElement.textContent = 'v' + chrome.runtime.getManifest().version;
 
   // Check if current tab is on Threads
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
